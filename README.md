@@ -1,1 +1,0 @@
-# Jvcdp starter - springboot , flyway,  JPA, Swagger and h2 #
