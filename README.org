@@ -1,0 +1,8 @@
+* jvcdp job dispatcher starter project
+
+Contains wrappers for:
+
+** Git userid password auth based commits
+** Git ssh based commits
+** Fallback to shell script/command line script wrapped inside Java
+** Spring Boot version is 1.5.1.Release, Swagger is enabled
