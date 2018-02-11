@@ -123,16 +123,11 @@ def runTests(duration) {
 
 
 def run_playbook(playbook_name, deploy_env) {
-	ansiblePlaybook("${playbook_name}") {
-			inventoryPath('hosts')
-			credentialsId('deployadmin')
-			become(true)
-			becomeUser("user")
-			hostKeyChecking(false)
-			extraVars {
-				extraVar(deploy_host, "${deploy_env}", false)
-			}
-		}
+ansiblePlaybook( 
+        playbook: "${playbook_name}",
+        inventory: 'hosts', 
+        credentialsId: 'deployadmin', 
+        extras: "-e deploy_host='${deploy_env}'")
 }
 
 def getTargetEnv(String branchName){
