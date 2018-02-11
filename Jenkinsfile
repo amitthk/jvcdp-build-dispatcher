@@ -123,14 +123,16 @@ def runTests(duration) {
 
 
 def run_playbook(playbook_name, deploy_env) {
-    unstash 'target';
-    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
-    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-    credentialsId: 'deployadmin',
-    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']])
-	 {
-	    sh "ansible-playbook ${playbook_name} --extra-vars deploy_host=${deploy_env}";
-	}
+	ansiblePlaybook("${playbook_name}") {
+			inventoryPath('hosts')
+			credentialsId('deployadmin')
+			become(true)
+			becomeUser("user")
+			hostKeyChecking(false)
+			extraVars {
+				extraVar(deploy_host, "${deploy_env}", false)
+			}
+		}
 }
 
 def getTargetEnv(String branchName){
