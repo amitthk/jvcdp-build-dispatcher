@@ -1,6 +1,7 @@
 ---
 - hosts: "{{ deploy_host | default('dev') }}"
   gather_facts: true
+  remote_user: "{{remote_user}}"
   become: false
   vars:
     base_dir: "~/app/"
@@ -8,14 +9,16 @@
     war_name: "jobdispatcher.war"
     deploy_context_root: "jobdispatcher"
     spring_profiles_active: "local"
+    package_base_dir: "{{inventory_dir | dirname}}"
+    tomcat_base_dir: "/opt/tomcat"
   tasks:
-    - stat: path=/opt/tomcat/bin/setenv.sh follow=yes
+    - stat: path="{{tomcat_base_dir}}/bin/setenv.sh" follow=yes
       register: setenv_status
       become: true
 
     - name: create blank 'setenv'
       file:
-        path: "/opt/tomcat/bin/setenv.sh"
+        path: "{{tomcat_base_dir}}/bin/setenv.sh"
         follow: yes
         state: touch
         owner: tomcat
@@ -24,9 +27,9 @@
       when: setenv_status.stat.exists is defined and not setenv_status.stat.exists
       become: true
 
-    - name: Ensures /opt/tomcat/bin/setenv.sh exists
+    - name: "Ensures {{tomcat_base_dir}}/bin/setenv.sh exists"
       file:
-        path: "/opt/tomcat/bin/setenv.sh"
+        path: "{{tomcat_base_dir}}/bin/setenv.sh"
         follow: yes
         state: file
         mode: 0755
@@ -35,11 +38,11 @@
       become: true
       
     - name: Set the SPRING_PROFILES_ACTIVE in setenv.sh to keep it permanent
-      lineinfile: "dest=/opt/tomcat/bin/setenv.sh line='export SPRING_PROFILES_ACTIVE=${deploy_host}' insertafter='EOF' state=present mode=0755 follow=yes"
+      lineinfile: "dest={{tomcat_base_dir}}/bin/setenv.sh line='export SPRING_PROFILES_ACTIVE=${deploy_host}' insertafter='EOF' state=present mode=0755 follow=yes"
       become: true
       
 #    - name: ensure SPRING_PROFILES_ACTIVE environment variable
-#      shell: "source /opt/tomcat/bin/setenv.sh && echo $SPRING_PROFILES_ACTIVE"
+#      shell: "source {{tomcat_base_dir}}/bin/setenv.sh && echo $SPRING_PROFILES_ACTIVE"
 #      become: true
 #      become_user: tomcat
 #      args:
@@ -51,9 +54,9 @@
     - name: "configure the {{war_name}} API"
       debug:
         msg: "configure the {{war_name}} API"
-    - name: Ensures /opt/tomcat/webapps/{{deploy_context_root}} dir exists
+    - name: "Ensures {{tomcat_base_dir}}/webapps/{{deploy_context_root}} dir exists"
       file:
-        path: "/opt/tomcat/webapps/{{deploy_context_root}}"
+        path: "{{tomcat_base_dir}}/webapps/{{deploy_context_root}}"
         follow: yes
         state: directory
       become: true
@@ -65,7 +68,7 @@
     - name: Unzip WAR file
       unarchive:
         src: "{{ playbook_dir }}/target/{{ war_name }}"
-        dest: /opt/tomcat/webapps/{{deploy_context_root}}/ 
+        dest: "{{tomcat_base_dir}}/webapps/{{deploy_context_root}}/"
         follow: yes
         mode: 0755
         owner: tomcat
@@ -74,7 +77,7 @@
 
     - name: Permissions for the artifacts
       file:
-        path: /opt/tomcat/webapps/{{deploy_context_root}}/ 
+        path: "{{tomcat_base_dir}}/webapps/{{deploy_context_root}}/"
         follow: yes
         mode: 0775
         owner: tomcat

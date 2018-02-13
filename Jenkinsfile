@@ -1,8 +1,6 @@
 import java.text.SimpleDateFormat
 
-testEnvUrl = 'http://localhost:8089/'
 
-stage 'Build'
 node {
 currentBuild.result = "SUCCESS"
   try{
@@ -14,6 +12,7 @@ currentBuild.result = "SUCCESS"
    def timeStamp;
    def baseDir;
    def deploy_env;
+   def deploy_userid;
    
    stage('Initalize'){
    //Get these from parameters later
@@ -25,10 +24,11 @@ currentBuild.result = "SUCCESS"
        baseDir = pwd();
 	   currentBranch = env.BRANCH_NAME;
 	   deploy_env=getTargetEnv(currentBranch);
+	   deploy_userid='ec2-user';
 //	   artifact_id = version();
    }
    stage('Checkout') { // for display purposes
-      // Get some code from a GitHub repository
+      // Get latest code from a GitHub repository
       checkout scm;
    }
    stage('Code Analysis'){
@@ -69,7 +69,7 @@ currentBuild.result = "SUCCESS"
 	def envlist = ["dev", "sit", "uat", "staging","prod"];
 		for(itm in envlist){
 			stage("Checkpoint ${itm}"){
-				checkAndDeploy(baseDir, itm, timeStamp);
+				checkAndDeploy(baseDir, itm, timeStamp, deploy_userid, project_id);
 			}
 		}
 	}
@@ -78,7 +78,7 @@ currentBuild.result = "SUCCESS"
 		{
 			stage("Deploy to ${deploy_env}")
 			{
-				checkAndDeploy(baseDir, deploy_env, timeStamp);
+				checkAndDeploy(baseDir, deploy_env, timeStamp, deploy_userid, project_id);
 			}
 		}
 	}
@@ -122,13 +122,7 @@ def runTests(duration) {
 }
 
 
-def run_playbook(playbook_name, deploy_env) {
-ansiblePlaybook( 
-        playbook: "${playbook_name}",
-        inventory: 'hosts', 
-        credentialsId: 'deployadmin', 
-        extras: "-e deploy_host='${deploy_env}'")
-}
+
 
 def getTargetEnv(String branchName){
 	def deploy_env="dev";
@@ -160,13 +154,13 @@ def getTargetEnv(String branchName){
 	return deploy_env;
 }
 
-def checkAndDeploy(String baseDir, String envname, String timeStamp){
+def checkAndDeploy(String baseDir, String envname, String timeStamp,  String deploy_userid, String project_id){
 	  def  c_userInput = false;
 	  def c_didTimeout = false;
 
 	if(envname=="dev"){
 	//Deploy directly to dev environment
-		run_playbook("main.yaml",envname);
+		run_playbook("main.yaml",envname,  deploy_userid, project_id);
 	}
 	else{
 
@@ -190,23 +184,26 @@ def checkAndDeploy(String baseDir, String envname, String timeStamp){
             echo "no input was received before timeout"
             currentBuild.result = 'ABORTED'
         } else {
-			run_playbook("main.yaml",envname);
+			run_playbook("main.yaml",envname, deploy_userid, project_id);
         } 
    }
 }
 
-
-def deploy(id) {
-    //unstash 'war'
-    //sh "cp x.war /tmp/webapps/${id}/${version()}"
-	echo 'call the playbook to deploy this war now.  sh ansible-playbook main.yaml --extra-vars "deploy_environment=test ansible_task=deploy-user-api deploy_host=localhost"';
-	unstash 'target';
-	sh 'make clean install';
+def run_playbook(playbook_name, deploy_env, String deploy_userid, String project_id) {
+		
+		def package_base_dir =  (pwd()+"/target/").toString();
+		def extras_params = "-v -e deploy_host=${deploy_env} -e remote_user=${deploy_userid} -e package_base_dir=${package_base_dir}".toString();
+		def playbook_to_run = "${playbook_name}".toString();
+		withEnv(['ANSIBLE_HOST_KEY_CHECKING=False']){
+		ansiblePlaybook( 
+		credentialsId: 'deployadmin',
+        playbook: playbook_to_run,
+        inventory: 'hosts', 
+        extras: extras_params)
+		}
 }
 
-def undeploy(id) {
-    sh "rm /tmp/webapps/${id}.war"
-}
+
 
 def runWithServer(body) {
     def id = UUID.randomUUID().toString()
